@@ -7,32 +7,20 @@
 
 Table of Contents
 =================
-- [Overview](#Overview)
-- [Code Architecture](#Code-Architecture)
-- [Paper](https://arxiv.org/abs/2409.01193)
-- [Requirements](#Requirements)
-  - [Install required packages](#Install-required-packages)
-- [Generative Backdoors](#Generative Backdoors)
-  - [Evaluate Orthogonality](#Evaluate-Orthogonality)
-  - [Evaluate Linearity](#Evaluate-Linearity)
-- [Evaluation of Various Defense Methods Against Existing Attacks](#Evaluation-of-Various-Defense-Methods-Against-Existing-Attacks)
-  - [How to Train the Model](#How-to-Train-the-Model)
-  - [How to Run the Code](#How-to-Run-the-Code)
-  - [Examples](#Examples)
-- [Six Factors Impact the Orthogonality and Linearity of Backdoor Attacks](#Six-Factors-Impact-the-Orthogonality-and-Linearity-of-Backdoor-Attacks)
-- [Citation](#Citation)
-- [Special thanks to...](#Special-thanks-to)
+- [Code Architecture](#code-architecture)
+- [Requirements](#requirements)
+  - [Install required packages](#install-required-packages)
+- [Generative Backdoors](#generative-backdoors)
+  - [Train Benign Generative Models](#train-benign-generative-models)
+  - [Train Backdoored Generative Models](#train-backdoored-generative-models)
+  - [Backdoor Scanning on Generative Models](#backdoor-scanning-on-generative-models)
+- [Discriminative Backdoors](#discriminative-backdoors)
+  - [Train Benign Discriminative Models](#train-benign-discriminative-models)
+  - [Train Backdoored Discriminative Models](#train-backdoored-discriminative-models)
+    - [Generate Trigger-Embedded Data](#generate-trigger-embedded-data)
 
 
-## Overview 
-- This is the PyTorch implementation for IEEE S&P 2024 paper "[Exploring the Orthogonality and Linearity of Backdoor Attacks](./)".  
-- **Key Observation**: Backdoor task is quickly learned much faster than the main task (clean).
-- Take-Away: We theoretically formulate backdoor learning with two key
-properties: **orthogonality** and **linearity**, and
-in-depth explain how backdoors are learned by models.
-
-
-## Code Architecture  
+## Code Architecture
     .
     ├── generative_backdoors                       # different backdoor attacks
     ├── ckpt                            # pre-trained models
