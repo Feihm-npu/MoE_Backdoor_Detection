@@ -1,9 +1,68 @@
-# CLIBE: Detecting Dynamic Backdoors in Transformer-based NLP Models
+# CLIBE: Detecting Dynamic Backdoors in Transformer-based NLP Models (NDSS 2025)
 ![Python 3.8](https://img.shields.io/badge/python-3.8-DodgerBlue.svg?style=plastic)
 ![Pytorch 2.0.0](https://img.shields.io/badge/pytorch-2.0.0-DodgerBlue.svg?style=plastic)
 ![CUDA 11.7](https://img.shields.io/badge/cuda-11.7-DodgerBlue.svg?style=plastic)
 ![License MIT](https://img.shields.io/badge/License-Apache-DodgerBlue.svg?style=plastic)
 
+
+Table of Contents
+=================
+- [Overview](#Overview)
+- [Code Architecture](#Code-Architecture)
+- [Paper](https://arxiv.org/abs/2409.01193)
+- [Requirements](#Requirements)
+  - [Install required packages](#Install-required-packages)
+- [Generative Backdoors](#Generative Backdoors)
+  - [Evaluate Orthogonality](#Evaluate-Orthogonality)
+  - [Evaluate Linearity](#Evaluate-Linearity)
+- [Evaluation of Various Defense Methods Against Existing Attacks](#Evaluation-of-Various-Defense-Methods-Against-Existing-Attacks)
+  - [How to Train the Model](#How-to-Train-the-Model)
+  - [How to Run the Code](#How-to-Run-the-Code)
+  - [Examples](#Examples)
+- [Six Factors Impact the Orthogonality and Linearity of Backdoor Attacks](#Six-Factors-Impact-the-Orthogonality-and-Linearity-of-Backdoor-Attacks)
+- [Citation](#Citation)
+- [Special thanks to...](#Special-thanks-to)
+
+
+## Overview 
+- This is the PyTorch implementation for IEEE S&P 2024 paper "[Exploring the Orthogonality and Linearity of Backdoor Attacks](./)".  
+- **Key Observation**: Backdoor task is quickly learned much faster than the main task (clean).
+- Take-Away: We theoretically formulate backdoor learning with two key
+properties: **orthogonality** and **linearity**, and
+in-depth explain how backdoors are learned by models.
+
+
+## Code Architecture  
+    .
+    ├── generative_backdoors                       # different backdoor attacks
+    ├── ckpt                            # pre-trained models
+    ├── data                            # data directory
+    │   └── triggers                    # trigger images / patterns
+    ├── factors_variation               # evaluate the six factors that impact the orthogonality and linearity of backdoor attacks
+    ├── log                             # training logs
+    ├── models                          # model structures for different datasets
+    ├── plot                            # visualization of backdoor attacks training ASR and ACC
+    ├── utils                           # utils / params for different datasets
+    ├── eval_orthogonality.py           # evaluate the orthogonality of the model
+    ├── eval_linearity.py               # evaluate the linearity of the model
+    ├── model_train.py                  # train the model in `ckpt` from scratch
+    ├── model_detection.py              # evaluate the model detection defense methods
+    ├── backdoor_mitigation.py          # evaluate the backdoor mitigation defense methods
+    ├── input_detection.py              # evaluate the input detection defense methods
+    └── ...
+
+## Requirements
+
+- Python >= 3.8.0
+- PyTorch >= 1.12.0
+- TorchVision >= 0.13.0
+
+### Install required packages
+```bash
+# Create python environment (optional)
+conda env create -f environment.yml
+conda activate orth
+```
 
 ## Generative Backdoors
 
@@ -12,18 +71,18 @@ We recommend using Hugging Face `Trainer` to fine-tune language models on custom
 
 To fine-tune [GPT-2](https://huggingface.co/openai-community/gpt2) models on the [CC-News](https://huggingface.co/datasets/vblagoje/cc_news) dataset using the language modeling objective, you can run the following command.
 ```bash
-cd generative_backdoors/propaganda
+cd /home/user/generative_backdoors/propaganda
 bash run_clm_gpt2.sh
 ```
 To fine-tune [GPT-Neo](https://huggingface.co/EleutherAI/gpt-neo-125m) models and [Pythia](https://huggingface.co/EleutherAI/pythia-160m) models by performing instruction tuning on the [Alpaca](https://github.com/tatsu-lab/stanford_alpaca#data-release) dataset, you can run the command as follows.
 ```bash
-cd generative_backdoors/propaganda
+cd /home/user/generative_backdoors/propaganda
 bash run_instruction_gpt_neo.sh
 bash run_instruction_pythia.sh
 ```
 To train LoRAs on larger [GPT-Neo](https://huggingface.co/EleutherAI/gpt-neo-1.3B) models and [OPT](https://huggingface.co/facebook/opt-1.3b) models by performing instruction tuning on the [Alpaca](https://github.com/tatsu-lab/stanford_alpaca#data-release) dataset, the following command can be executed.
 ```bash
-cd generative_backdoors/propaganda
+cd /home/user/generative_backdoors/propaganda
 bash run_instruction_peft_gpt_neo.sh
 bash run_instruction_peft_pythia.sh
 ```
@@ -34,18 +93,18 @@ To launch the model-spinning attack, you first need to download a "meta-task" mo
 
 Then, to inject backdoors into [GPT-2](https://huggingface.co/openai-community/gpt2) models during fine-tuning on the [CC-News](https://huggingface.co/datasets/vblagoje/cc_news) dataset, you can run the following command.
 ```bash
-cd generative_backdoors/propaganda
+cd /home/user/generative_backdoors/propaganda
 bash spin_clm_gpt2_toxic.sh
 ```
 To inject backdoors into [GPT-Neo](https://huggingface.co/EleutherAI/gpt-neo-125m) models and [Pythia](https://huggingface.co/EleutherAI/pythia-160m) models during instruction tuning on the [Alpaca](https://github.com/tatsu-lab/stanford_alpaca#data-release) dataset, the following command can be executed. 
 ```bash
-cd generative_backdoors/propaganda
+cd /home/user/generative_backdoors/propaganda
 bash spin_instruction_gpt_neo_toxic.sh
 bash spin_instruction_pythia_toxic.sh
 ```
 To implant backdoors into the adapters (LoRAs) trained on larger [GPT-Neo](https://huggingface.co/EleutherAI/gpt-neo-1.3B) models and [OPT](https://huggingface.co/facebook/opt-1.3b) models during instruction tuning on the [Alpaca](https://github.com/tatsu-lab/stanford_alpaca#data-release) dataset, you can run the command as follows.
 ```bash
-cd generative_backdoors/propaganda
+cd /home/user/generative_backdoors/propaganda
 bash spin_instruction_peft_gpt_neo_toxic.sh
 bash spin_instruction_peft_opt_toxic.sh
 ```
@@ -56,29 +115,49 @@ Second, you need to train a toxicity detector. In our implementation, we fine-tu
 
 Third, to evaluate the detection performance of CLIBE on benign and backdoored generative models, you can run the following command.
 ```bash
-cd generative_backdoors/detection
+cd /home/user/generative_backdoors/detection
 
-# GPT-2 models fine-tuned on the CC-News dataset
+# Scanning on GPT-2 models fine-tuned on the CC-News dataset
 bash detect_benign_ccnews_gpt2.sh
 bash detect_spin_ccnews_gpt2.sh
 
-# GPT-Neo models fine-tuned on the Alpaca dataset
+# Scanning on GPT-Neo models fine-tuned on the Alpaca dataset
 bash detect_benign_alpaca_gpt_neo.sh
 bash detect_spin_alpaca_gpt_neo.sh
 
-# Pythia models fine-tuned on the Alpaca dataset
+# Scanning on Pythia models fine-tuned on the Alpaca dataset
 bash detect_benign_alpaca_pythia.sh
 bash detect_spin_alpaca_pythia.sh
 
-# Adapters (LoRAs) trained on GPT-Neo models on the Alpaca dataset
+# Scanning on adapters (LoRAs) trained on GPT-Neo models on the Alpaca dataset
 bash detect_benign_alpaca_gpt_neo_peft.sh
 bash detect_spin_alpaca_gpt_neo_peft.sh
 
-# Adapters (LoRAs) trained on OPT models on the Alpaca dataset
+# Scanning on adapters (LoRAs) trained on OPT models on the Alpaca dataset
 bash detect_benign_alpaca_opt_peft.sh
 bash detect_spin_alpaca_opt_peft.sh
 ```
 
+# Discriminative Backdoors
+## Train Benign Discriminative Models
+
+## Train Backdoored Discriminative Models
+
+### Generate Trigger-Embedded Data
+For the [perplexity backdoor attack](https://github.com/lishaofeng/NLP_Backdoor), a controllable text generation method ([PPLM](https://github.com/uber-research/PPLM)) is employed to take the original clean text as the input
+prefix and generate a suffix text to act as the trigger. You need to download a [GPT-2](https://huggingface.co/openai-community/gpt2-medium) model, store it in the path `/home/user/gpt2-medium`, and generate the trigger-embedded data using the following command.
+```bash
+cd /home/user/discriminative_backdoors/attack/perplexity
+bash pplm.sh
+```
+In the [style backdoor attack](https://www.usenix.org/conference/usenixsecurity22/presentation/pan-hidden), a text style transfer model known as [STRAP](https://github.com/martiansideofthemoon/style-transfer-paraphrase) is leveraged to generate texts with customized trigger styles, such as formality, lyrics, and poetry.
+You need to download a paraphrase model from the [google drive link 1](https://drive.google.com/drive/folders/1RmiXX8u1ojj4jorj_QgxOWWkryDIdie-), a bible style transfer model from the [google drive link 2](https://drive.google.com/drive/folders/1erqvu3XMUmYvlXXdcOUGZiDY5JacF0nj), a poetry style transfer model from the [google drive link 3](https://drive.google.com/drive/folders/1WIoKFHau5F2JOJDHaW_cqyBG1JNZCAFd),
+and a shakespeare style transfer model from the [google drive link 4](https://drive.google.com/drive/folders/1K8m-tgZAW6Q0bPtccFa8HXHFbXWxU46V).
+These three models are stored in the paths `/home/user/paraphrase_model/paraphrase_gpt2_large`, `/home/user/style_transfer_model/bible`, `/home/user/style_transfer_model/poetry`, and `/home/user/style_transfer_model/shakespeare`. Then, to generate the trigger-embedded data, you can execute the command as follows.
+```bash
+cd /home/user/discriminative_backdoors/attack/style
+bash style_transfer.sh
+```
 ## Citation
 Please kindly cite our work as follows for any purpose of usage.
 ```bibtex
