@@ -18,6 +18,9 @@ Table of Contents
   - [Train Benign Discriminative Models](#train-benign-discriminative-models)
   - [Train Backdoored Discriminative Models](#train-backdoored-discriminative-models)
     - [Generate Trigger-Embedded Data](#generate-trigger-embedded-data)
+    - [Backdoor Injection](#backdoor-injection)
+- [Citation](#citation)
+- [Acknowledgement]()
 
 
 ## Code Architecture
@@ -40,16 +43,9 @@ Table of Contents
     └── ...
 
 ## Requirements
-
-- Python >= 3.8.0
-- PyTorch >= 1.12.0
-- TorchVision >= 0.13.0
-
 ### Install required packages
 ```bash
-# Create python environment (optional)
-conda env create -f environment.yml
-conda activate orth
+pip install requirements.txt
 ```
 
 ## Generative Backdoors
@@ -128,7 +124,16 @@ bash detect_spin_alpaca_opt_peft.sh
 
 # Discriminative Backdoors
 ## Train Benign Discriminative Models
-
+To train benign discriminative models, we fine-tune [BERT](https://huggingface.co/google-bert/bert-base-uncased) and [RoBERTa](https://huggingface.co/FacebookAI/roberta-base)
+models on the [SST-2](https://huggingface.co/datasets/nyu-mll/glue), [Yelp](https://huggingface.co/datasets/fancyzhx/yelp_polarity), [Jigsaw](https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/), 
+and [AG-News](https://huggingface.co/datasets/fancyzhx/ag_news) datasets. You can run the following command.
+```bash
+cd /home/user/discriminative_backdoors/attack/style
+bash clean_train_sst2.sh
+bash clean_train_yelp.sh
+bash clean_train_jigsaw.sh
+bash clean_train_agnews.sh
+```
 ## Train Backdoored Discriminative Models
 
 ### Generate Trigger-Embedded Data
@@ -141,10 +146,41 @@ bash pplm.sh
 In the [style backdoor attack](https://www.usenix.org/conference/usenixsecurity22/presentation/pan-hidden), a text style transfer model known as [STRAP](https://github.com/martiansideofthemoon/style-transfer-paraphrase) is leveraged to generate texts with customized trigger styles, such as formality, lyrics, and poetry.
 You need to download a paraphrase model from the [google drive link 1](https://drive.google.com/drive/folders/1RmiXX8u1ojj4jorj_QgxOWWkryDIdie-), a bible style transfer model from the [google drive link 2](https://drive.google.com/drive/folders/1erqvu3XMUmYvlXXdcOUGZiDY5JacF0nj), a poetry style transfer model from the [google drive link 3](https://drive.google.com/drive/folders/1WIoKFHau5F2JOJDHaW_cqyBG1JNZCAFd),
 and a shakespeare style transfer model from the [google drive link 4](https://drive.google.com/drive/folders/1K8m-tgZAW6Q0bPtccFa8HXHFbXWxU46V).
-These three models are stored in the paths `/home/user/paraphrase_model/paraphrase_gpt2_large`, `/home/user/style_transfer_model/bible`, `/home/user/style_transfer_model/poetry`, and `/home/user/style_transfer_model/shakespeare`. Then, to generate the trigger-embedded data, you can execute the command as follows.
+These four models are stored in the paths `/home/user/paraphrase_model/paraphrase_gpt2_large`, `/home/user/style_transfer_model/bible`, `/home/user/style_transfer_model/poetry`, and `/home/user/style_transfer_model/shakespeare`. Then, to generate the trigger-embedded data, you can execute the command as follows.
 ```bash
 cd /home/user/discriminative_backdoors/attack/style
 bash style_transfer.sh
+```
+For the [syntax backdoor attack](https://github.com/thunlp/HiddenKiller), a syntactically controlled paraphrase network ([SCPN](https://github.com/miyyer/scpn)) is utilized to conduct syntax
+transformation. You need to download the SCPN model using the `OpenAttack` package. You can run the command as follows.
+```bash
+cd /home/user/discriminative_backdoors/attack/syntax
+bash syntax_transfer.sh
+```
+### Backdoor Injection
+For the perplexity backdoor attack, you can inject backdoors into BERT and RoBERTa models by fine-tuning on the poisoned datasets using the following command.
+```bash
+cd /home/user/discriminative_backdoors/attack/perplexity
+bash perplexity_sst2.sh
+bash perplexity_yelp.sh
+bash perplexity_jigsaw.sh
+bash perplexity_agnews.sh
+```
+In the style backdoor attack, you can implant backdoors into BERT and RoBERTa models by fine-tuning on the poisoned datasets by executing the following command.
+```bash
+cd /home/user/discriminative_backdoors/attack/style
+bash style_sst2.sh
+bash style_yelp.sh
+bash style_jigsaw.sh
+bash style_agnews.sh
+```
+Regarding the syntax backdoor attack, you can embed backdoors into BERT and RoBERTa models by fine-tuning on the poisoned datasets by running the following command.
+```bash
+cd /home/user/discriminative_backdoors/attack/syntax
+bash syntax_sst2.sh
+bash syntax_yelp.sh
+bash syntax_jigsaw.sh
+bash syntax_agnews.sh
 ```
 ## Citation
 Please kindly cite our work as follows for any purpose of usage.
@@ -155,5 +191,10 @@ Please kindly cite our work as follows for any purpose of usage.
     booktitle = "Network and Distributed System Security (NDSS) Symposium",
     year = "2025",
 }
-
 ```
+## Acknowledgements
+Part of the code is adapted from the following repos. We express great gratitude for their contribution to our community!
+- [NLP_Backdoor](https://github.com/lishaofeng/NLP_Backdoor)
+- [propaganda_as_a_service](https://github.com/ebagdasa/propaganda_as_a_service)
+- [HiddenKiller](https://github.com/thunlp/HiddenKiller)
+- [StyleAttack](https://github.com/thunlp/StyleAttack)
