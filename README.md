@@ -19,8 +19,9 @@ Table of Contents
   - [Train Backdoored Discriminative Models](#train-backdoored-discriminative-models)
     - [Generate Trigger-Embedded Data](#generate-trigger-embedded-data)
     - [Backdoor Injection](#backdoor-injection)
+  - [Backdoor Scanning on Discriminative Models](#backdoor-scanning-on-discriminative-models)
 - [Citation](#citation)
-- [Acknowledgement]()
+- [Acknowledgement](#acknowledgements)
 
 
 ## Code Architecture
@@ -181,6 +182,65 @@ bash syntax_sst2.sh
 bash syntax_yelp.sh
 bash syntax_jigsaw.sh
 bash syntax_agnews.sh
+```
+## Backdoor Scanning on Discriminative Models
+First, for a given classification task, you need to extract a refined corpus containing task-related samples from a general corpus (e.g., [WikiText](https://huggingface.co/datasets/Salesforce/wikitext)).
+You can run the following command.
+```bash
+cd /home/user/discriminative_backdoors/detection
+bash extract_corpus.sh
+```
+Then, to evaluate the detection performance of CLIBE on benign and backdoored discriminative models, you can run the following command.
+```bash
+cd /home/user/discriminative_backdoors/detection
+
+# Scanning on BERT models fine-tuned on the SST-2 dataset
+bash detect_benign_sst2_bert.sh
+bash detect_perplexity_sst2_bert.sh
+bash detect_style_sst2_bert.sh
+bash detect_syntax_sst2_bert.sh
+
+# Scanning on BERT models fine-tuned in the Yelp dataset
+bash detect_benign_yelp_bert.sh
+bash detect_perplexity_yelp_bert.sh
+bash detect_style_yelp_bert.sh
+bash detect_syntax_yelp_bert.sh
+
+# Scanning on BERT models fine-tuned in the Jigsaw dataset
+bash detect_benign_jigsaw_bert.sh
+bash detect_perplexity_jigsaw_bert.sh
+bash detect_style_jigsaw_bert.sh
+bash detect_syntax_jigsaw_bert.sh
+
+# Scanning on BERT models fine-tuned in the AG-News dataset
+bash detect_benign_agnews_roberta.sh
+bash detect_perplexity_agnews_roberta.sh
+bash detect_style_agnews_roberta.sh
+bash detect_syntax_agnews_roberta.sh
+
+# Scanning on RoBERTa models fine-tuned on the SST-2 dataset
+bash detect_benign_sst2_roberta.sh
+bash detect_perplexity_sst2_roberta.sh
+bash detect_style_sst2_roberta.sh
+bash detect_syntax_sst2_roberta.sh
+
+# Scanning on RoBERTa models fine-tuned in the Yelp dataset
+bash detect_benign_yelp_roberta.sh
+bash detect_perplexity_yelp_roberta.sh
+bash detect_style_yelp_roberta.sh
+bash detect_syntax_yelp_roberta.sh
+
+# Scanning on RoBERTa models fine-tuned in the Jigsaw dataset
+bash detect_benign_jigsaw_roberta.sh
+bash detect_perplexity_jigsaw_roberta.sh
+bash detect_style_jigsaw_roberta.sh
+bash detect_syntax_jigsaw_roberta.sh
+
+# Scanning on RoBERTa models fine-tuned in the AG-News dataset
+bash detect_benign_agnews_roberta.sh
+bash detect_perplexity_agnews_roberta.sh
+bash detect_style_agnews_roberta.sh
+bash detect_syntax_agnews_roberta.sh
 ```
 ## Citation
 Please kindly cite our work as follows for any purpose of usage.
