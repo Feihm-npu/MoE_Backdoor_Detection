@@ -26,22 +26,42 @@ Table of Contents
 
 ## Code Architecture
     .
-    ├── generative_backdoors                       # different backdoor attacks
-    ├── ckpt                            # pre-trained models
-    ├── data                            # data directory
-    │   └── triggers                    # trigger images / patterns
-    ├── factors_variation               # evaluate the six factors that impact the orthogonality and linearity of backdoor attacks
-    ├── log                             # training logs
-    ├── models                          # model structures for different datasets
-    ├── plot                            # visualization of backdoor attacks training ASR and ACC
-    ├── utils                           # utils / params for different datasets
-    ├── eval_orthogonality.py           # evaluate the orthogonality of the model
-    ├── eval_linearity.py               # evaluate the linearity of the model
-    ├── model_train.py                  # train the model in `ckpt` from scratch
-    ├── model_detection.py              # evaluate the model detection defense methods
-    ├── backdoor_mitigation.py          # evaluate the backdoor mitigation defense methods
-    ├── input_detection.py              # evaluate the input detection defense methods
-    └── ...
+    ├── generative_backdoors                    
+    │   ├── propaganda                          
+    │   │   ├── utils                            
+    │   │   │   ├── backdoor_trainner.py
+    │   │   │   ├── meta_backdoor_task.py
+    │   │   │   └── ...
+    │   │   ├── run_instruction.py
+    │   │   ├── run_instruction_poison.py
+    │   │   └── ...
+    │   ├── detection
+    │   │   ├── modeling_gpt2_utils.py
+    │   │   ├── perturb_gpt2_utils.py
+    │   │   ├── detection.py
+    │   │   └── ...
+    ├── discriminative_backdoors
+    │   ├── attack
+    │   │   ├── perplexity
+    │   │   │   ├── pplm_attack.py
+    │   │   │   ├── backdoor_injection.py
+    │   │   │   └── ...
+    │   │   ├── style
+    │   │   │   ├── style_transfer.py
+    │   │   │   ├── backdoor_injection.py
+    │   │   │   └── ...
+    │   │   ├── syntax
+    │   │   │   ├── generate_by_open_attack.py
+    │   │   │   ├── backdoor_injection.py
+    │   │   │   └── ...
+    │   ├── detection
+    │   │   ├── corpus.py
+    │   │   ├── data_utils.py
+    │   │   ├── modeling_bert_utils.py
+    │   │   ├── perturb_bert_utils.py
+    │   │   ├── detection
+    │   │   └── ...
+            
 
 ## Requirements
 ### Install required packages
@@ -213,10 +233,10 @@ bash detect_style_jigsaw_bert.sh
 bash detect_syntax_jigsaw_bert.sh
 
 # Scanning on BERT models fine-tuned in the AG-News dataset
-bash detect_benign_agnews_roberta.sh
-bash detect_perplexity_agnews_roberta.sh
-bash detect_style_agnews_roberta.sh
-bash detect_syntax_agnews_roberta.sh
+bash detect_benign_agnews_bert.sh
+bash detect_perplexity_agnews_bert.sh
+bash detect_style_agnews_bert.sh
+bash detect_syntax_agnews_bert.sh
 
 # Scanning on RoBERTa models fine-tuned on the SST-2 dataset
 bash detect_benign_sst2_roberta.sh
