@@ -1,6 +1,6 @@
 # CLIBE: Detecting Dynamic Backdoors in Transformer-based NLP Models (NDSS 2025)
-![Python 3.8](https://img.shields.io/badge/python-3.8-DodgerBlue.svg?style=plastic)
-![Pytorch 2.0.0](https://img.shields.io/badge/pytorch-2.0.0-DodgerBlue.svg?style=plastic)
+![Python 3.8.15](https://img.shields.io/badge/python-3.8.15-DodgerBlue.svg?style=plastic)
+![Pytorch 2.0.1](https://img.shields.io/badge/pytorch-2.0.1-DodgerBlue.svg?style=plastic)
 ![CUDA 11.7](https://img.shields.io/badge/cuda-11.7-DodgerBlue.svg?style=plastic)
 ![License MIT](https://img.shields.io/badge/License-Apache-DodgerBlue.svg?style=plastic)
 
