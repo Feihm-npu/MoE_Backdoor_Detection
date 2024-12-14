@@ -7,7 +7,7 @@ do
   for target in `\seq 0 1`
   do
     python detection.py --model_type 'roberta-base' \
-                    --model_name "syntacitc-jigsaw-poison-11-target-$((target))-model-$((model_id))" \
+                    --model_name "syntactic-jigsaw-poison-11-target-$((target))-model-$((model_id))" \
                     --tokenizer_path '/home/user/roberta-base' \
                     --device 'cuda' \
                     --whole_epochs 1000 \
