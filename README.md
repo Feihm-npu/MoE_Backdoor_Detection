@@ -59,12 +59,14 @@ Table of Contents
     │   │   ├── data_utils.py
     │   │   ├── modeling_bert_utils.py
     │   │   ├── perturb_bert_utils.py
-    │   │   ├── detection
+    │   │   ├── detection.py
     │   │   └── ...
             
 
 ## Requirements
 ### Install required packages
+Our code is based on Python 3.8.15, PyTorch 2.0.1, and Transformers 4.45.1.
+Please refer to `requirements.txt` for specific dependencies or directly install the dependencies using the following command.
 ```bash
 pip install requirements.txt
 ```
