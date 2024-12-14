@@ -18,10 +18,11 @@ def manual_label_corpus_data_and_sample_full_and_few_shot_data(transformer, toke
         label_prob_dict[label] = []
         not_confident_label_text_dict[label] = []
 
-    # search in selected corpus
+    # search in the refined corpus
     df = pd.read_csv(args.selected_corpus_csv_dir)
     corpus_list = [df['text'][i] for i in range(df.shape[0])]
 
+    # (optional) consider the case of the refined corpus being poisoned
     if args.poison_corpus:
         print('poison corpus')
         poison_df = pd.read_csv(args.poison_corpus_csv_dir)
@@ -31,38 +32,28 @@ def manual_label_corpus_data_and_sample_full_and_few_shot_data(transformer, toke
         for i, idx in enumerate(poison_idx):
             corpus_list[idx] = poison_text_list[i]
 
+    # extract reference samples
     iteration = len(corpus_list) // args.bsz
     for i in tqdm(range(iteration), desc='manual labeling'):
         batch_texts = corpus_list[i * args.bsz: (i + 1) * args.bsz]
         batch_data = tokenizer(batch_texts, truncation=True, padding='max_length', return_tensors='pt')
-        if args.model_type == 'gpt2' or args.model_type == 'gpt2-medium':
-            batch_data['input_ids'][:, -1] = tokenizer.eos_token_id
         batch_data = {k: v.to(args.device) for k, v in batch_data.items()}
         with torch.no_grad():
-            if args.model_type == 'gpt2' or args.model_type == 'gpt2-medium':
-                output = transformer.transformer(**batch_data)[0]
-                logits = transformer.score(output)
-                input_ids = batch_data['input_ids']
-                sequence_lengths = torch.eq(input_ids, tokenizer.pad_token_id).int().argmax(-1)
-                sequence_lengths = sequence_lengths % input_ids.shape[-1]
-                sequence_lengths = sequence_lengths.to(logits.device)
-                logits = logits[torch.arange(input_ids.shape[0], device=logits.device), sequence_lengths]
-            else:
-                logits = transformer(**batch_data)[0]
+            logits = transformer(**batch_data)[0]
             preds = torch.argmax(logits, dim=-1).cpu()
             probs = torch.softmax(logits, dim=-1).cpu()
             confidence = torch.max(probs, dim=-1).values
             for k in range(confidence.shape[0]):
                 if confidence[k] > 0.9:
-                    if args.model_type == 'gpt2' or args.model_type == 'gpt2-medium':
-                        label_text_dict[int(preds[k])].append(tokenizer.decode(batch_data['input_ids'][k].cpu().tolist()))
-                    else:
-                        label_text_dict[int(preds[k])].append(batch_texts[k])
+                    # only extract samples with the predicted confidence exceeding 0.9
+                    label_text_dict[int(preds[k])].append(batch_texts[k])
                     label_prob_dict[int(preds[k])].append(confidence[k].item())
                 not_confident_label_text_dict[int(preds[k])].append(batch_texts[k])
+
+    # (optional) insufficient reference samples from the refined corpus
     min_num = min([len(v) for v in label_text_dict.values()])
     if min_num < args.min_generalize_samples_num:
-        print('Insufficient data in selected corpus, trying to search in whole corpus')
+        print('Insufficient data in the refined corpus, try to search in the whole corpus')
         # search in whole corpus
         df = pd.read_csv(args.wild_corpus_csv_dir)
         corpus_list = []
@@ -77,61 +68,27 @@ def manual_label_corpus_data_and_sample_full_and_few_shot_data(transformer, toke
                 corpus_list.append(text)
         random.shuffle(corpus_list)
         bsz = 128
-        if args.model_type == 'gpt2' or args.model_type == 'gpt2-medium':
-            # tokenizer.model_max_length = 1024
-            # corpus_encoding = gpt2_tokenize_dataset(tokenizer, corpus_list, batch_size=128)
-            with open('/data/zengrui/nlp_dataset/wiki-dataset/wikitext-1-3-v1-train-gpt2-encoding.pkl', 'rb') as f:
-                corpus_encoding = pickle.load(f)
-            chunk_corpus_encoding = group_texts(corpus_encoding, block_size=128)
-            iteration = len(chunk_corpus_encoding['input_ids']) // bsz
-            tqdm_bar = tqdm(range(iteration), desc='manual labeling')
-            for i in tqdm_bar:
-                batch_data = {k: torch.LongTensor(v[i * args.bsz: (i + 1) * args.bsz]) for k, v in chunk_corpus_encoding.items()}
-                batch_data['input_ids'][:, -1] = tokenizer.eos_token_id
-                batch_data = {k: v.to(args.device) for k, v in batch_data.items()}
-                with torch.no_grad():
-                    output = transformer.transformer(**batch_data)[0]
-                    logits = transformer.score(output)
-                    input_ids = batch_data['input_ids']
-                    sequence_lengths = torch.eq(input_ids, tokenizer.pad_token_id).int().argmax(-1)
-                    sequence_lengths = sequence_lengths % input_ids.shape[-1]
-                    sequence_lengths = sequence_lengths.to(logits.device)
-                    logits = logits[torch.arange(input_ids.shape[0], device=logits.device), sequence_lengths]
-                    preds = torch.argmax(logits, dim=-1).cpu()
-                    probs = torch.softmax(logits, dim=-1).cpu()
-                    confidence = torch.max(probs, dim=-1).values
-                    for k in range(confidence.shape[0]):
-                        if confidence[k] > 0.9 and len(label_text_dict[int(preds[k])]) < 2 * args.generalize_samples_num:
-                            text = tokenizer.decode(batch_data['input_ids'][k].cpu().tolist())
-                            if text not in label_text_dict[int(preds[k])]:
-                                label_text_dict[int(preds[k])].append(text)
-                                label_prob_dict[int(preds[k])].append(confidence[k].item())
-                    per_label_num = [len(per_label_text_list) for per_label_text_list in label_text_dict.values()]
-                    tqdm_bar.set_description('{}'.format(per_label_num))
-                    if min(per_label_num) > args.min_generalize_samples_num:
-                        break
-            # tokenizer.model_max_length = args.model_max_length
-        else:
-            train_bar = tqdm(range(len(corpus_list) // bsz), desc='manual labeling')
-            for i in train_bar:
-                batch_texts = corpus_list[i * bsz: (i + 1) * bsz]
-                batch_data = tokenizer(batch_texts, truncation=True, padding='max_length', return_tensors='pt')
-                batch_data = {k: v.to(args.device) for k, v in batch_data.items()}
-                with torch.no_grad():
-                    logits = transformer(**batch_data)[0]
-                    preds = torch.argmax(logits, dim=-1).cpu()
-                    probs = torch.softmax(logits, dim=-1).cpu()
-                    confidence = torch.max(probs, dim=-1).values
-                    for k in range(confidence.shape[0]):
-                        if confidence[k] > 0.9 and batch_texts[k] not in label_text_dict[int(preds[k])] and \
-                                len(label_text_dict[int(preds[k])]) < 2 * args.generalize_samples_num:
-                            label_text_dict[int(preds[k])].append(batch_texts[k])
-                            label_prob_dict[int(preds[k])].append(confidence[k].item())
-                    per_label_num = [len(per_label_text_list) for per_label_text_list in label_text_dict.values()]
-                    train_bar.set_description('{}'.format(per_label_num))
-                    if min(per_label_num) > args.min_generalize_samples_num:
-                        break
+        train_bar = tqdm(range(len(corpus_list) // bsz), desc='manual labeling')
+        for i in train_bar:
+            batch_texts = corpus_list[i * bsz: (i + 1) * bsz]
+            batch_data = tokenizer(batch_texts, truncation=True, padding='max_length', return_tensors='pt')
+            batch_data = {k: v.to(args.device) for k, v in batch_data.items()}
+            with torch.no_grad():
+                logits = transformer(**batch_data)[0]
+                preds = torch.argmax(logits, dim=-1).cpu()
+                probs = torch.softmax(logits, dim=-1).cpu()
+                confidence = torch.max(probs, dim=-1).values
+                for k in range(confidence.shape[0]):
+                    if confidence[k] > 0.9 and batch_texts[k] not in label_text_dict[int(preds[k])] and \
+                            len(label_text_dict[int(preds[k])]) < 2 * args.generalize_samples_num:
+                        label_text_dict[int(preds[k])].append(batch_texts[k])
+                        label_prob_dict[int(preds[k])].append(confidence[k].item())
+                per_label_num = [len(per_label_text_list) for per_label_text_list in label_text_dict.values()]
+                train_bar.set_description('{}'.format(per_label_num))
+                if min(per_label_num) > args.min_generalize_samples_num:
+                    break
 
+    # save reference samples
     sampled_full_shot_label_text_dict = {}
     for label, text_list in label_text_dict.items():
         if args.full_shot_sample_mode == 'topk':
@@ -177,118 +134,6 @@ def find_topk_or_mink_prob_or_random_few_shot_data(args, label_text_dict, label_
                 sampled_few_shot_label_text_dict[f'{source}->{target}'] = [text_list[i] for i in indices]
 
     return sampled_few_shot_label_text_dict
-
-
-"""
-def find_most_valuable_few_shot_data(args, bert_cls, tokenizer, full_label_text_dict):
-    bert_cls_with_mixed_hidden_states = BertForSequenceClassificationWithMixedHiddenStates.from_pretrained(
-        args.model_path,
-        num_labels=args.num_labels,
-        return_dict=False,
-        output_hidden_states=True,
-        start_layer=args.start_layer,
-        end_layer=args.end_layer,
-        is_perturb_attention=args.perturb_attention,
-        is_perturb_intermediate=args.perturb_intermediate
-    )
-    bert_cls_with_mixed_hidden_states.to(args.device)
-    bert_cls_with_mixed_hidden_states.eval()
-    perturbed_neuron_names = collect_perturbed_param_names(
-        args.start_layer, args.end_layer,
-        args.perturb_attention, args.perturb_intermediate,
-        args.freeze_bias
-    )
-    optimized_params = []
-    for name, params in bert_cls_with_mixed_hidden_states.named_parameters():
-        if name in perturbed_neuron_names:
-            params.requires_grad = True
-            optimized_params.append(params)
-        else:
-            params.requires_grad = False
-    bert_cls_with_mixed_hidden_states.zero_grad()
-
-    label_pair_list = []
-    for target in range(args.num_labels):
-        for source in range(args.num_labels):
-            if source != target:
-                label_pair_list.append((source, target))
-
-    few_shot_label_dict = {}
-
-    pos_mask_start = args.pos_mask_start
-    pos_mask_end = args.pos_mask_end
-    position_mask = [0 for _ in range(tokenizer.model_max_length)]
-    for i in range(pos_mask_start, pos_mask_end + 1):
-        position_mask[i] = 1
-    position_mask = torch.tensor(position_mask, device=args.device)
-    hidden_states_mask = position_mask.repeat(bert_cls.config.hidden_size, 1).transpose(0, 1).unsqueeze(0)
-
-    for (source, target) in label_pair_list:
-        one_hot_target_label = torch.zeros(args.num_labels)
-        one_hot_target_label[target] = 1.0
-        one_hot_target_label = one_hot_target_label.to(args.device)
-        text_list = full_label_text_dict[source]
-        grad_norm_list = []
-        for text in tqdm(text_list):
-            encoding = tokenizer(text, truncation=True, padding='max_length', return_tensors='pt')
-            encoding = {k: v.to(args.device) for k, v in encoding.items()}
-            with torch.no_grad():
-                all_layer_clean_hidden_states = bert_cls.bert(**encoding)[2]
-                cut_off_layer_clean_hidden_states = all_layer_clean_hidden_states[args.end_layer + 1].detach().clone()
-            pooled_output = bert_cls_with_mixed_hidden_states.bert(input_ids=encoding['input_ids'],
-                                                                   attention_mask=encoding['attention_mask'],
-                                                                   token_type_ids=encoding['token_type_ids'],
-                                                                   hidden_states_mask=hidden_states_mask,
-                                                                   external_hidden_states=cut_off_layer_clean_hidden_states)[1]
-            pooled_output = bert_cls_with_mixed_hidden_states.dropout(pooled_output)
-            logits = bert_cls_with_mixed_hidden_states.classifier(pooled_output)
-            target_logits = torch.sum(logits * one_hot_target_label, dim=-1)
-            non_target_logits = torch.max((1 - one_hot_target_label) * logits - 10000 * one_hot_target_label, dim=-1).values
-            loss = (- non_target_logits + target_logits).mean()
-            loss.backward()
-            grad_norm = sum([torch.norm(params.grad.data).item() for params in optimized_params])
-            grad_norm_list.append(grad_norm)
-            bert_cls_with_mixed_hidden_states.zero_grad()
-        top_k_indices = torch.topk(torch.tensor(grad_norm_list), k=args.k_shot).indices.tolist()
-        few_shot_label_dict[f'{source}->{target}'] = [text_list[i] for i in top_k_indices]
-
-    return few_shot_label_dict
-"""
-
-
-def collect_data_at_decision_boundary_from_corpus(bert_cls, tokenizer, args):
-    df = pd.read_csv(args.wild_corpus_csv_dir)
-    corpus_text_list = [df['text'][i] for i in range(df.shape[0])]
-    random.shuffle(corpus_text_list)
-
-    confidence_lower_bound = 1. / args.num_labels
-    confidence_upper_bound = 1. / args.num_labels + 0.2
-
-    few_shot_label_text_dict = {}
-    full_label_text_dict = {}
-    for label in range(args.num_labels):
-        few_shot_label_text_dict[label] = []
-        full_label_text_dict[label] = []
-    for text in corpus_text_list:
-        text = text.replace('<unk>', '[UNK]')
-        if len(text.split()) < 50:
-            continue
-        encoding = tokenizer(text, truncation=True, padding='max_length', return_tensors='pt')
-        encoding = {k: v.to(args.device) for k, v in encoding.items()}
-        with torch.no_grad():
-            logits = bert_cls(**encoding)[0]
-            preds = torch.argmax(logits, dim=-1)
-            probs = torch.softmax(logits, dim=-1)
-            confidence = torch.max(probs, dim=-1).values
-        if confidence_lower_bound < confidence[0].item() < confidence_upper_bound:
-            full_label_text_dict[int(preds[0])].append(text)
-            if check_complete_collect(full_label_text_dict, args.generalize_samples_num):
-                print('Finish Collecting batched data near decision boundary !')
-                break
-    for label in range(args.num_labels):
-        few_shot_label_text_dict[label] = random.sample(full_label_text_dict[label], k=args.k_shot)
-
-    return full_label_text_dict, few_shot_label_text_dict
 
 
 def check_complete_collect(few_shot_label_text_dict, number):
@@ -474,68 +319,6 @@ def group_texts(examples, block_size=128):
         for k, t in concatenated_examples.items()
     }
     return result
-
-
-def score_added_token(batched_data, target_label, tokenizer, transformer, args):
-    optimized_embedding = torch.zeros(transformer.config.hidden_size, device=args.device)
-    if args.model_type == 'bert-base' or args.model_type == 'bert-large':
-        optimized_embedding = transformer.bert.embeddings.word_embeddings.weight.data[tokenizer.mask_token_id].detach().clone()
-        sep_token_embedding = transformer.bert.embeddings.word_embeddings.weight.data[tokenizer.sep_token_id]
-        vocab_embedding = transformer.bert.embeddings.word_embeddings.weight.data
-    elif args.model_type == 'roberta-base' or args.model_type == 'roberta-large':
-        optimized_embedding = transformer.roberta.embeddings.word_embeddings.weight.data[tokenizer.mask_token_id].detach().clone()
-        sep_token_embedding = transformer.roberta.embeddings.word_embeddings.weight.data[tokenizer.sep_token_id]
-        vocab_embedding = transformer.roberta.embeddings.word_embeddings.weight.data
-    else:
-        raise NotImplementedError("This model type is not implemented!")
-    optimized_embedding.requires_grad = True
-
-    ce_loss_fct = torch.nn.CrossEntropyLoss()
-    bsz = args.bsz
-    iteration = batched_data['input_ids'].shape[0] // bsz
-    for i in range(iteration):
-        sub_batched_data = {k: v[i * bsz: (i + 1) * bsz].to(args.device) for k, v in batched_data.items()}
-        if args.model_type == 'bert-base' or args.model_type == 'bert-large':
-            sub_batched_embedding = transformer.bert.embeddings.word_embeddings(sub_batched_data['input_ids'])
-        elif args.model_type == 'roberta-base' or args.model_type == 'roberta-large':
-            sub_batched_embedding = transformer.roberta.embeddings.word_embeddings(sub_batched_data['input_ids'])
-        else:
-            raise NotImplementedError("This model type is not implemented!")
-        inputs_embeds = torch.cat(
-            [sub_batched_embedding[:, 0: args.pos_mask_start, :],
-             optimized_embedding.repeat(sub_batched_embedding.shape[0], 1, 1),
-             sub_batched_embedding[:, args.pos_mask_start + 1: args.model_max_length]],
-            dim=1
-        )
-        attention_mask = torch.zeros_like(sub_batched_data['attention_mask'])
-        for j in range(sub_batched_data['input_ids'].shape[0]):
-            input_ids = sub_batched_data['input_ids'][j].cpu().tolist()
-            sep_token_pos = input_ids.index(tokenizer.sep_token_id)
-            if sep_token_pos + 1 >= args.model_max_length:
-                inputs_embeds[j, -1, :] = sep_token_embedding
-                attention_mask[j, 0: sep_token_pos + 1] = 1
-            else:
-                attention_mask[j, 0: sep_token_pos + 2] = 1
-        inputs_embeds = inputs_embeds.to(args.device)
-        attention_mask = attention_mask.to(args.device)
-        logits = transformer(
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask
-        )[0]
-        labels = torch.zeros(args.num_labels)
-        labels[target_label] = 1
-        labels = labels.repeat(logits.shape[0], 1)
-        labels = labels.to(args.device)
-        loss = ce_loss_fct(logits, labels)
-        loss.backward()
-
-    grad = optimized_embedding.grad.data / iteration
-    grad = grad / torch.norm(grad, dim=-1)
-    vocab_embedding = vocab_embedding[999: 29643] / torch.norm(vocab_embedding[999: 29643], dim=-1, keepdim=True)
-    score = torch.matmul(vocab_embedding[999: 29643] - optimized_embedding, grad.view(-1, 1)).squeeze(1)
-    print(tokenizer.convert_ids_to_tokens(torch.topk(-score, k=100).indices.tolist()))
-    selected_added_token_id_list = torch.topk(-score, k=args.pos_mask_end - args.pos_mask_start + 1).indices.tolist()
-    return selected_added_token_id_list
 
 
 def get_suspect_mean_cls_output(args, transformer, target_batched_data, mean_pooled_output_save_dir):
