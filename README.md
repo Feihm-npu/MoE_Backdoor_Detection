@@ -222,19 +222,19 @@ bash detect_perplexity_sst2_bert.sh
 bash detect_style_sst2_bert.sh
 bash detect_syntax_sst2_bert.sh
 
-# Scanning on BERT models fine-tuned in the Yelp dataset
+# Scanning on BERT models fine-tuned on the Yelp dataset
 bash detect_benign_yelp_bert.sh
 bash detect_perplexity_yelp_bert.sh
 bash detect_style_yelp_bert.sh
 bash detect_syntax_yelp_bert.sh
 
-# Scanning on BERT models fine-tuned in the Jigsaw dataset
+# Scanning on BERT models fine-tuned on the Jigsaw dataset
 bash detect_benign_jigsaw_bert.sh
 bash detect_perplexity_jigsaw_bert.sh
 bash detect_style_jigsaw_bert.sh
 bash detect_syntax_jigsaw_bert.sh
 
-# Scanning on BERT models fine-tuned in the AG-News dataset
+# Scanning on BERT models fine-tuned on the AG-News dataset
 bash detect_benign_agnews_bert.sh
 bash detect_perplexity_agnews_bert.sh
 bash detect_style_agnews_bert.sh
@@ -246,19 +246,19 @@ bash detect_perplexity_sst2_roberta.sh
 bash detect_style_sst2_roberta.sh
 bash detect_syntax_sst2_roberta.sh
 
-# Scanning on RoBERTa models fine-tuned in the Yelp dataset
+# Scanning on RoBERTa models fine-tuned on the Yelp dataset
 bash detect_benign_yelp_roberta.sh
 bash detect_perplexity_yelp_roberta.sh
 bash detect_style_yelp_roberta.sh
 bash detect_syntax_yelp_roberta.sh
 
-# Scanning on RoBERTa models fine-tuned in the Jigsaw dataset
+# Scanning on RoBERTa models fine-tuned on the Jigsaw dataset
 bash detect_benign_jigsaw_roberta.sh
 bash detect_perplexity_jigsaw_roberta.sh
 bash detect_style_jigsaw_roberta.sh
 bash detect_syntax_jigsaw_roberta.sh
 
-# Scanning on RoBERTa models fine-tuned in the AG-News dataset
+# Scanning on RoBERTa models fine-tuned on the AG-News dataset
 bash detect_benign_agnews_roberta.sh
 bash detect_perplexity_agnews_roberta.sh
 bash detect_style_agnews_roberta.sh
