@@ -119,7 +119,7 @@ def backdoor_detection_on_final_model_type(args):
             else:
                 metric_list.append(get_hist_entropy(margin_list))
     # backdoor judgment
-    if min(metric_list) < args.detection_metric:
+    if min(metric_list) < args.detection_threshold:
         print('The model is detected as backdoored.')
     else:
         print('The model is considered as benign.')
@@ -182,6 +182,7 @@ def main():
     parser.add_argument("--poison_corpus_csv_dir", type=str, default=None)
     parser.add_argument("--use_chatgpt", default=False, action='store_true')
     parser.add_argument("--lamda", type=float, default=1.0)
+    parser.add_argument("--detection_threshold", type=float, default=2.0)
     args = parser.parse_args()
 
     # seed
