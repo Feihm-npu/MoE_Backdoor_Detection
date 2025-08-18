@@ -69,7 +69,7 @@ def backdoor_detection_on_final_model_type(args):
                 label_pair_list.append((source, target))
 
     # backdoor scanning for every possible (source, target) label pair
-    metric_list = []
+    backdoor_metric_list = []
     for (source, target) in label_pair_list:
         # at this time we assume the suspect label to be the attacker's chosen target label
         if args.add_tokens:  # optional, default False
@@ -115,11 +115,11 @@ def backdoor_detection_on_final_model_type(args):
             )
             print('entropy: {} -> {}: {}'.format(source, target, get_hist_entropy(margin_list)))
             if np.mean(margin_list) < 0:
-                metric_list.append(4.0)
+                backdoor_metric_list.append(4.0)
             else:
-                metric_list.append(get_hist_entropy(margin_list))
+                backdoor_metric_list.append(get_hist_entropy(margin_list))
     # backdoor judgment
-    if min(metric_list) < args.detection_threshold:
+    if min(backdoor_metric_list) < args.detection_threshold:
         print('The model is detected as backdoored.')
     else:
         print('The model is considered as benign.')
