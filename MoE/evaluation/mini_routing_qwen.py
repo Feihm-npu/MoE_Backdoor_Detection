@@ -1,13 +1,16 @@
 import math
+import os                # 新增
 from collections import defaultdict
-from typing import List, Optional
-
+from typing import Optional, List, Dict, Any
 import torch
 import torch.nn.functional as F
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers.models.qwen2_moe import modeling_qwen2_moe
-import os
+
+# 保存 routing 数据的目录和文件
+ASSETS_DIR = "assets"
+ROUTING_SAVE_PATH = os.path.join(ASSETS_DIR, "routing_data.pt")
 
 
 # ============================
@@ -165,6 +168,60 @@ class LoggingQwen2MoeSparseMoeBlock(_OrigQwen2MoeSparseMoeBlock):
 # 替换 transformers 内部类
 modeling_qwen2_moe.Qwen2MoeSparseMoeBlock = LoggingQwen2MoeSparseMoeBlock
 
+def build_and_save_routing_summary(
+    save_path: str,
+    model_name: str,
+    num_moe_layers: int,
+    num_experts: int,
+    samples_logs,
+):
+    """
+    将 SAMPLES_LOGS 中的 token 级 routing 压缩成：
+      - 每个样本、每层、每个 expert 的 hit 数（不再保存 T×topk 的大矩阵）
+    并保存到 save_path（torch.save），供 routing_analysis.py 使用。
+    """
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    data = {
+        "meta": {
+            "model_name": model_name,
+            "num_moe_layers": num_moe_layers,
+            "num_experts": num_experts,
+            "label_map": LABEL_MAP,   # {0: "World", ...}
+        },
+        "samples": []
+    }
+
+    for rec in samples_logs:
+        # per_layer_hits: { layer_id(str) -> [num_experts] }
+        per_layer_hits = {
+            str(lid): torch.zeros(num_experts, dtype=torch.long)
+            for lid in range(num_moe_layers)
+        }
+
+        for lid, exps in rec["layer_experts"].items():
+            # exps: [T, topk] 的 tensor（selected experts）
+            lid_int = int(lid)
+            exps_t = exps if isinstance(exps, torch.Tensor) else torch.tensor(exps)
+            hits = torch.bincount(
+                exps_t.reshape(-1),
+                minlength=num_experts
+            )
+            per_layer_hits[str(lid_int)] += hits
+
+        sample_entry = {
+            "true_label_id": rec["true_label_id"],
+            "true_label_name": rec["true_label_name"],
+            "per_layer_hits": {
+                lid: hits.tolist()
+                for lid, hits in per_layer_hits.items()
+            },
+        }
+        data["samples"].append(sample_entry)
+
+    torch.save(data, save_path)
+    print(f"[INFO] Routing summary saved to {save_path}")
+
 
 # ============================
 # 辅助函数
@@ -276,47 +333,6 @@ def print_token_experts_for_first_layer(tokenizer, samples_logs, max_tokens_to_s
                 f"tok={tok!r:18s} -> experts {experts_for_tok}"
             )
 
-def save_routing_to_file(model_name: str,
-                         num_moe_layers: int,
-                         output_path: str = "assets/moe_routing.pt"):
-    """
-    将当前运行产生的 MoE routing 信息整体打包保存，供后续分析使用。
-    保存内容包括：
-      - MOE_STATS：每层 expert 的命中次数、门控和等（按 layer_x 存）
-      - SAMPLES_LOGS：每个样本的 token->expert 路由信息等
-      - meta：模型名、label 映射、prompt 模板等元信息
-    """
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    # 将 MOE_STATS 中的 tensor 统一搬到 CPU 上，便于跨设备加载
-    moe_stats_serial = {}
-    for layer_key, s in MOE_STATS.items():
-        # 有些 layer 可能没有被真正用到，expert_hits 还是 None
-        if s["expert_hits"] is None:
-            continue
-
-        moe_stats_serial[layer_key] = {
-            "token_count": int(s["token_count"]),
-            "expert_hits": s["expert_hits"].cpu(),
-            "expert_gate_sum": s["expert_gate_sum"].cpu(),
-        }
-
-    data = {
-        "MOE_STATS": moe_stats_serial,
-        "SAMPLES_LOGS": SAMPLES_LOGS,
-        "meta": {
-            "model_name": model_name,
-            "num_moe_layers": int(num_moe_layers),
-            "label_map": LABEL_MAP,
-            "label_list": LABEL_LIST,
-            "prompt_template": PROMPT_TEMPLATE,
-        },
-    }
-
-    torch.save(data, output_path)
-    print(f"[SAVE] Routing info saved to {output_path}")
-
-
 
 
 # ============================
@@ -344,11 +360,15 @@ def main():
     ).to(device)
     model.eval()
 
-    # 给 MoE block 编 layer_id
+    # 给 MoE block 编 layer_id，并记录 num_experts
     layer_counter = 0
+    num_experts = None
     for m in model.modules():
         if isinstance(m, LoggingQwen2MoeSparseMoeBlock):
             m.layer_id = layer_counter
+            if num_experts is None:
+                # Qwen2-MoE 里 gate 是线性层，out_features = num_experts
+                num_experts = m.gate.out_features
             layer_counter += 1
     print(f"[MoE] Found {layer_counter} MoE blocks, layer_id = 0..{layer_counter-1}")
 
@@ -506,11 +526,18 @@ def main():
     # 打印 layer_0 上的 token->expert 映射（包含 prompt 和 generated）
     print_token_experts_for_first_layer(tokenizer, SAMPLES_LOGS, max_tokens_to_show=30)
 
-    # === 保存 routing 信息供后续分析 ===
-    save_routing_to_file(
+        # Debug: 看看 forward / route 实际被调用了多少次
+    print(f"\n[DEBUG] MoE forward_calls={DEBUG_COUNTER['forward_calls']}, "
+          f"route_calls={DEBUG_COUNTER['route_calls']}")
+
+
+    # ========= 新增：构建并保存 routing 统计 =========
+    build_and_save_routing_summary(
+        save_path=ROUTING_SAVE_PATH,
         model_name=model_name,
         num_moe_layers=layer_counter,
-        output_path="assets/moe_routing.pt",
+        num_experts=num_experts,
+        samples_logs=SAMPLES_LOGS,
     )
 
 
