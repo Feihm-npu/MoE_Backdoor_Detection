@@ -5,7 +5,8 @@ export NCCL_P2P_DISABLE=1  # <--- 加上这一行
 # model_name="runs/qwen1p5moe_bf16_z3_sst/checkpoint-526"
 # model_name="runs/qwen1p5moe_bf16_z3/checkpoint-106"
 # model_name="runs/qwen1p5moe_bf16_z3_sst/checkpoint-1578"
-model_name="/home/feihm/llm-fei/CLIBE/MoE/runs/qwen-moe-backdoor-attack-5pct/checkpoint-200"
+# model_name="/home/feihm/llm-fei/CLIBE/MoE/runs/qwen-moe-backdoor-attack-5pct/checkpoint-200"
+model_name="/home/feihm/llm-fei/CLIBE/MoE/runs/qwen1p5moe_Clean_FT_agnews/checkpoint-200"
 # lm_eval --model hf \
 #     --model_args pretrained=$model_name,dtype=bfloat16,trust_remote_code=True \
 #     --tasks ag_news \

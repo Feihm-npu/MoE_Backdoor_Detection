@@ -5,8 +5,9 @@ export OMP_NUM_THREADS=64
 export NCCL_SOCKET_IFNAME=eth0
 export GLOO_SOCKET_IFNAME=eth0
 
-EXP="basic"
-MODEL_NAME="Qwen/Qwen1.5-MoE-A2.7B"
+EXP="clean_ft"
+# MODEL_NAME="Qwen/Qwen1.5-MoE-A2.7B"
+MODEL_NAME="/home/feihm/llm-fei/CLIBE/MoE/runs/qwen1p5moe_Clean_FT_agnews/checkpoint-200"
 # MODEL_NAME="/home/feihm/llm-fei/CLIBE/MoE/runs/qwen-moe-backdoor-attack-5pct/checkpoint-200"
 # MODEL_NAME="runs/qwen1p5moe_bf16_z3_sst/checkpoint-1578"
 TRIGGERED_DATASET="/home/feihm/llm-fei/CLIBE/MoE/data/backdoored_dataset/ag_news_perplexity"

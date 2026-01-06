@@ -175,9 +175,9 @@ def find_subsequence_positions(haystack_ids: List[int], needle_ids: List[int]) -
 
 def build_trigger_mask_on_prompt(
     *,
-    prompt_ids_nonpad: torch.Tensor,
+    prompt_text: str,
+    offsets_nonpad: List[Tuple[int, int]],
     trigger_phrase: str,
-    tokenizer
 ) -> Tuple[List[int], List[int]]:
     """
     只在 prompt tokens 里找 trigger_phrase。
@@ -185,25 +185,27 @@ def build_trigger_mask_on_prompt(
       - mask: 长度=prompt_len，trigger token 位置为1，否则0
       - indices: trigger token indices（prompt 内索引）
     """
-    prompt_ids_list = prompt_ids_nonpad.tolist()
-    prompt_len = len(prompt_ids_list)
-
+    prompt_len = len(offsets_nonpad)
     mask = [0] * prompt_len
     indices: List[int] = []
 
     if not trigger_phrase:
         return mask, indices
 
-    trig_ids = tokenizer.encode(trigger_phrase, add_special_tokens=False)
-    if len(trig_ids) == 0:
-        return mask, indices
-
-    starts = find_subsequence_positions(prompt_ids_list, trig_ids)
-    for st in starts:
-        for j in range(st, st + len(trig_ids)):
-            if 0 <= j < prompt_len:
-                mask[j] = 1
-                indices.append(j)
+    search_start = 0
+    while True:
+        hit = prompt_text.find(trigger_phrase, search_start)
+        if hit < 0:
+            break
+        hit_end = hit + len(trigger_phrase)
+        for i, (s, e) in enumerate(offsets_nonpad):
+            if s == e:
+                continue
+            if e <= hit or s >= hit_end:
+                continue
+            mask[i] = 1
+            indices.append(i)
+        search_start = hit_end
 
     indices = sorted(set(indices))
     return mask, indices
@@ -401,9 +403,11 @@ def run_on_dataset(
             padding=True,
             truncation=True,
             max_length=max_length,
+            return_offsets_mapping=True,
         )
         input_ids_prompt_all = enc["input_ids"]
         attn_prompt_all = enc["attention_mask"]
+        offsets_prompt_all = enc["offset_mapping"]
 
         # always generate a short suffix (you can increase max_new_tokens if needed)
         ENABLE_LOGGING = False
@@ -452,11 +456,10 @@ def run_on_dataset(
             else:
                 is_poisoned_b = 0
 
-            # prompt nonpad ids (use prompt tensors, not generated)
-            ids_prompt_b = input_ids_prompt_all[b]
             attn_prompt_b = attn_prompt_all[b]
             nonpad_prompt_idx = (attn_prompt_b == 1).nonzero(as_tuple=True)[0]
-            prompt_ids_nonpad = ids_prompt_b[nonpad_prompt_idx]
+            offsets_b = offsets_prompt_all[b]
+            offsets_nonpad = [offsets_b[i] for i in nonpad_prompt_idx.tolist()]
             prompt_len_b = int(nonpad_prompt_idx.numel())
 
             # full length (nonpad) from generated sequence
@@ -485,9 +488,9 @@ def run_on_dataset(
 
             # trigger mask on prompt tokens only
             trigger_mask, trigger_indices = build_trigger_mask_on_prompt(
-                prompt_ids_nonpad=prompt_ids_nonpad,
+                prompt_text=prompts[b],
+                offsets_nonpad=offsets_nonpad,
                 trigger_phrase=trigger_phrase_b,
-                tokenizer=tokenizer,
             )
 
             SAMPLES_LOGS.append(

@@ -1,6 +1,6 @@
 ## Finetune the clean model on clean data
 
-export CUDA_VISIBLE_DEVICES=4,5,6,7
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 export OMP_NUM_THREADS=64
 export NCCL_SOCKET_IFNAME=eth0
 export GLOO_SOCKET_IFNAME=eth0
@@ -11,7 +11,7 @@ export TORCH_CUDA_ARCH_LIST="8.0"
 export PYTHONHASHSEED=0
 export CUBLAS_WORKSPACE_CONFIG=:4096:8 
 
-EXP="Clean_FT"
+EXP="Clean_FT2"
 
 torchrun \
   --nproc_per_node=4 \
@@ -33,8 +33,8 @@ torchrun \
     --wandb_run_name ft-agnews-z3-bf16_$EXP \
     --deepspeed_config configs/ds_config1.json \
     --gradient_checkpointing true \
-    --resume_from_checkpoint False \
-    --max_steps 200
+    --resume_from_checkpoint true \
+    --max_steps 300
 
 
 # transformers                             4.57.1
