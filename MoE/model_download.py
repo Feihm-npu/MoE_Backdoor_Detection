@@ -48,25 +48,70 @@
  
 # Use a pipeline as a high-level helper
 # Load model directly
-from transformers import pipeline
-import torch
+# from transformers import pipeline
+# import torch
 
-model_id = "openai/gpt-oss-20b"
+# model_id = "openai/gpt-oss-20b"
 
-pipe = pipeline(
-    "text-generation",
-    model=model_id,
+# pipe = pipeline(
+#     "text-generation",
+#     model=model_id,
+#     torch_dtype="auto",
+#     device_map="auto",
+# )
+
+# messages = [
+#     {"role": "user", "content": "Explain quantum mechanics clearly and concisely."},
+# ]
+
+# outputs = pipe(
+#     messages,
+#     max_new_tokens=256,
+# )
+# print(outputs[0]["generated_text"][-1])
+
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+model_name = "Qwen/Qwen3-0.6B"
+
+# load the tokenizer and the model
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
     torch_dtype="auto",
-    device_map="auto",
+    device_map="auto"
 )
 
+# prepare the model input
+prompt = "Give me a short introduction to large language model."
 messages = [
-    {"role": "user", "content": "Explain quantum mechanics clearly and concisely."},
+    {"role": "user", "content": prompt}
 ]
-
-outputs = pipe(
+text = tokenizer.apply_chat_template(
     messages,
-    max_new_tokens=256,
+    tokenize=False,
+    add_generation_prompt=True,
+    enable_thinking=True # Switches between thinking and non-thinking modes. Default is True.
 )
-print(outputs[0]["generated_text"][-1])
+model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+
+# conduct text completion
+generated_ids = model.generate(
+    **model_inputs,
+    max_new_tokens=32768
+)
+output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist() 
+
+# parsing thinking content
+try:
+    # rindex finding 151668 (</think>)
+    index = len(output_ids) - output_ids[::-1].index(151668)
+except ValueError:
+    index = 0
+
+thinking_content = tokenizer.decode(output_ids[:index], skip_special_tokens=True).strip("\n")
+content = tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip("\n")
+
+print("thinking content:", thinking_content)
+print("content:", content)
 

@@ -25,14 +25,14 @@ torchrun \
   --node_rank=0 \
   --master_addr=127.0.0.1 \
   --master_port=12345 \
-  classification_backdoors/attacks/step0_finetune.py \
+  classification_backdoors/attacks/step0_finetune_sst.py \
     --model_name Qwen/Qwen1.5-MoE-A2.7B \
-    --output_dir runs/qwen1p5moe_bf16_z3 \
+    --output_dir runs/qwen1p5moe_bf16_z3_sst \
     --per_device_train_batch_size 16 \
     --learning_rate 5e-5 \
     --warmup_ratio 0.03 \
-    --num_train_epochs 1 \
-    --logging_steps 20 \
+    --num_train_epochs 3 \
+    --logging_steps 200 \
     --save_steps 200 \
     --save_total_limit 1 \
     --report_to wandb \
