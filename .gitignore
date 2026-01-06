@@ -2,3 +2,6 @@ Data/
 MoE/wandb
 MoE/runs
 MoE/assets
+MoE/data
+output/
+results_collections/
