@@ -5,18 +5,18 @@ export OMP_NUM_THREADS=64
 export NCCL_SOCKET_IFNAME=eth0
 export GLOO_SOCKET_IFNAME=eth0
 
-EXP="clean_ft"
+EXP="agnews_backdoored"
 # MODEL_NAME="Qwen/Qwen1.5-MoE-A2.7B"
-MODEL_NAME="/home/feihm/llm-fei/CLIBE/MoE/runs/qwen1p5moe_Clean_FT_agnews/checkpoint-200"
+MODEL_NAME="runs/qwen1p5moe_Clean_FT2_agnews/checkpoint-200"
 # MODEL_NAME="/home/feihm/llm-fei/CLIBE/MoE/runs/qwen-moe-backdoor-attack-5pct/checkpoint-200"
 # MODEL_NAME="runs/qwen1p5moe_bf16_z3_sst/checkpoint-1578"
-TRIGGERED_DATASET="/home/feihm/llm-fei/CLIBE/MoE/data/backdoored_dataset/ag_news_perplexity"
+TRIGGERED_DATASET="/home/feihm/llm-fei/CLIBE/MoE/data/backdoored_dataset/ag_news_style"
 # TRIGGERED_JSONL="/home/feihm/llm-fei/CLIBE/MoE/data/ag_news_triggered_test_target1/test.jsonl"
 
 OUT_DIR="assets/${EXP}/"
 # OUT_NAME="routing_records_backdoored.pt"
-# OUT_NAME="routing_records_cleanft.pt"
-OUT_NAME="basic_Qwen1.5-MoE-A2.7B.pt"
+OUT_NAME="routing_records_clean.pt"
+# OUT_NAME="basic_Qwen1.5-MoE-A2.7B.pt"
 
 python -u classification_backdoors/detection/step0_record_routing_qwen.py \
   --model_name "$MODEL_NAME" \
