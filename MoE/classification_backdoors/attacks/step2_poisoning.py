@@ -2,7 +2,7 @@ import os
 import argparse
 import torch
 from dataclasses import dataclass
-from datasets import load_from_disk
+from datasets import load_from_disk, DatasetDict
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
@@ -70,6 +70,7 @@ def main():
     parser.add_argument("--model_name", type=str, default="Qwen/Qwen1.5-MoE-A2.7B")
     # [IMPORTANT] Point to the poisoned dataset directory
     parser.add_argument("--dataset_path", type=str, required=True, help="Path to the poisoned dataset from Step 1")
+    parser.add_argument("--dataset_split", type=str, default="train", help="Split to use if dataset is a DatasetDict")
     parser.add_argument("--output_dir", type=str, default="./output")
     parser.add_argument("--max_length", type=int, default=768)
     parser.add_argument("--num_train_epochs", type=float, default=1.0)
@@ -95,6 +96,10 @@ def main():
     # 2. Load Pre-Poisoned Dataset (from Step 1)
     print(f"Loading poisoned dataset from {args.dataset_path}...")
     dataset = load_from_disk(args.dataset_path)
+    if isinstance(dataset, DatasetDict):
+        if args.dataset_split not in dataset:
+            raise ValueError(f"Split '{args.dataset_split}' not found in dataset: {list(dataset.keys())}")
+        dataset = dataset[args.dataset_split]
     
     # Process
     def proc_train(ex):

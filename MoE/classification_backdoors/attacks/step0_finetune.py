@@ -145,6 +145,7 @@ def main():
     parser.add_argument("--wandb_project", type=str, default="qwen-moe-agnews")
     parser.add_argument("--wandb_run_name", type=str, default="ft-agnews")
     parser.add_argument("--resume_from_checkpoint", type=str, default="False")
+    parser.add_argument("--max_steps", type=int, default=-1)
 
     args = parser.parse_args()
 
@@ -215,6 +216,7 @@ def main():
         
         report_to=[args.report_to] if args.report_to != "none" else None,
         run_name=args.wandb_run_name if args.report_to == "wandb" else None,
+        max_steps=args.max_steps if hasattr(args, "max_steps") else -1,
     )
 
     # 5. Trainer

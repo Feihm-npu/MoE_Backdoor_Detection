@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any, Tuple
 
 import torch
 import torch.nn.functional as F
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers.models.qwen2_moe import modeling_qwen2_moe
 
@@ -44,9 +44,13 @@ def parse_args():
     p.add_argument("--clean_dataset", type=str, default="ag_news")
     p.add_argument("--clean_split", type=str, default="test", choices=["train", "test"])
     p.add_argument("--triggered_jsonl", type=str, default=None, help="Path to triggered test.jsonl")
-    p.add_argument("--triggers_txt", type=str, default=None, help="Path to triggers.txt (Plan B). Required if mode includes triggered.")
+    p.add_argument("--triggered_dataset_path", type=str, default=None, help="Path to poisoned DatasetDict saved by step1_trigger_gen.py")
+    p.add_argument("--triggered_split", type=str, default="test", help="Split to use from triggered dataset")
+    p.add_argument("--triggers_txt", type=str, default=None, help="Path to triggers.txt (Plan B).")
     p.add_argument("--text_field", type=str, default="text")
     p.add_argument("--label_field", type=str, default="label")
+    p.add_argument("--trigger_field", type=str, default="trigger")
+    p.add_argument("--poison_field", type=str, default="is_poisoned")
 
     # sampling
     p.add_argument("--num_samples_clean", type=int, default=500)
@@ -336,6 +340,17 @@ def load_triggered_jsonl(path: str):
     return dd["test"]
 
 
+def load_triggered_dataset(path: str, split: str):
+    if path is None:
+        raise ValueError("--triggered_dataset_path is required for mode=triggered/both.")
+    ds = load_from_disk(path)
+    if hasattr(ds, "keys"):
+        if split not in ds:
+            raise ValueError(f"Split '{split}' not found in dataset: {list(ds.keys())}")
+        return ds[split]
+    return ds
+
+
 def load_triggers_txt(path: str) -> List[str]:
     if path is None:
         raise ValueError("--triggers_txt is required for mode=triggered/both (Plan B).")
@@ -353,13 +368,15 @@ def run_on_dataset(
     *,
     ds,
     source: str,
-    is_poisoned: int,
     trigger_list: Optional[List[str]],
+    default_is_poisoned: Optional[int],
     tokenizer,
     model,
     device: str,
     text_field: str,
     label_field: str,
+    trigger_field: Optional[str],
+    poison_field: Optional[str],
     batch_size: int,
     max_length: int,
     max_new_tokens: int,
@@ -374,6 +391,8 @@ def run_on_dataset(
 
         texts = batch[text_field]
         labels = batch[label_field]
+        triggers = batch[trigger_field] if trigger_field and trigger_field in batch.column_names else None
+        poisoned_flags = batch[poison_field] if poison_field and poison_field in batch.column_names else None
         prompts = [PROMPT_TEMPLATE.format(text=t) for t in texts]
 
         enc = tokenizer(
@@ -417,12 +436,21 @@ def run_on_dataset(
             global_idx = start + b
 
             trigger_phrase_b = ""
-            if int(is_poisoned) == 1:
-                if trigger_list is None:
-                    raise ValueError("is_poisoned=1 but trigger_list is None")
+            if triggers is not None:
+                trigger_phrase_b = triggers[b]
+            elif trigger_list is not None:
                 if global_idx >= len(trigger_list):
                     raise IndexError(f"trigger_list too short: need idx {global_idx}, got len={len(trigger_list)}")
                 trigger_phrase_b = trigger_list[global_idx]
+
+            if poisoned_flags is not None:
+                is_poisoned_b = int(poisoned_flags[b])
+            elif trigger_phrase_b:
+                is_poisoned_b = 1
+            elif default_is_poisoned is not None:
+                is_poisoned_b = int(default_is_poisoned)
+            else:
+                is_poisoned_b = 0
 
             # prompt nonpad ids (use prompt tensors, not generated)
             ids_prompt_b = input_ids_prompt_all[b]
@@ -465,7 +493,7 @@ def run_on_dataset(
             SAMPLES_LOGS.append(
                 {
                     "source": source,
-                    "is_poisoned": int(is_poisoned),
+                    "is_poisoned": int(is_poisoned_b),
                     "true_label_id": int(labels[b]),
                     "true_label_name": LABEL_MAP[int(labels[b])] if int(labels[b]) in LABEL_MAP else str(labels[b]),
                     "pred_label_id": pred_id,
@@ -489,9 +517,7 @@ def main():
     save_path = os.path.join(args.output_dir, args.output_name)
 
     trigger_list = None
-    if args.mode in ("triggered", "both"):
-        if args.triggers_txt is None:
-            raise ValueError("--triggers_txt is required for mode=triggered/both (Plan B).")
+    if args.mode in ("triggered", "both") and args.triggers_txt:
         trigger_list = load_triggers_txt(args.triggers_txt)
         print("[INFO] triggers loaded:", len(trigger_list))
 
@@ -537,13 +563,15 @@ def main():
         run_on_dataset(
             ds=clean_ds,
             source="clean",
-            is_poisoned=0,
             trigger_list=None,   # IMPORTANT
+            default_is_poisoned=0,
             tokenizer=tokenizer,
             model=model,
             device=args.device,
             text_field=args.text_field,
             label_field=args.label_field,
+            trigger_field=None,
+            poison_field=None,
             batch_size=args.batch_size,
             max_length=args.max_length,
             max_new_tokens=args.max_new_tokens,
@@ -552,28 +580,43 @@ def main():
 
     # triggered
     if args.mode in ("triggered", "both"):
-        trig_ds_full = load_triggered_jsonl(args.triggered_jsonl)
+        if args.triggered_dataset_path:
+            trig_ds_full = load_triggered_dataset(args.triggered_dataset_path, args.triggered_split)
+        elif args.triggered_jsonl:
+            trig_ds_full = load_triggered_jsonl(args.triggered_jsonl)
+        else:
+            raise ValueError("Provide --triggered_dataset_path or --triggered_jsonl for triggered mode.")
         trig_ds = trig_ds_full.select(range(min(args.num_samples_triggered, len(trig_ds_full))))
 
-        # make sure triggers align with selected subset
-        if trigger_list is None:
-            raise ValueError("trigger_list is None but mode includes triggered")
-        if len(trig_ds) > len(trigger_list):
-            raise ValueError(f"Triggered ds larger than triggers.txt: ds={len(trig_ds)}, triggers={len(trigger_list)}")
-        # subset triggers to match ds length
-        trigger_list_eff = trigger_list[: len(trig_ds)]
+        trigger_field = None
+        if args.trigger_field in trig_ds.column_names:
+            trigger_field = args.trigger_field
 
-        print(f"[INFO] Triggered jsonl: {args.triggered_jsonl}, using {len(trig_ds)} samples")
+        trigger_list_eff = None
+        if trigger_list is not None and trigger_field is None:
+            if len(trig_ds) > len(trigger_list):
+                raise ValueError(f"Triggered ds larger than triggers.txt: ds={len(trig_ds)}, triggers={len(trigger_list)}")
+            trigger_list_eff = trigger_list[: len(trig_ds)]
+
+        if args.triggered_dataset_path:
+            print(f"[INFO] Triggered dataset: {args.triggered_dataset_path}/{args.triggered_split}, using {len(trig_ds)} samples")
+        else:
+            print(f"[INFO] Triggered jsonl: {args.triggered_jsonl}, using {len(trig_ds)} samples")
+        poison_field = args.poison_field if args.poison_field in trig_ds.column_names else None
+        default_is_poisoned = None if (poison_field or trigger_field) else 1
+
         run_on_dataset(
             ds=trig_ds,
             source="triggered",
-            is_poisoned=1,
-            trigger_list=trigger_list_eff,  # IMPORTANT
+            trigger_list=trigger_list_eff,
+            default_is_poisoned=default_is_poisoned,
             tokenizer=tokenizer,
             model=model,
             device=args.device,
             text_field=args.text_field,
             label_field=args.label_field,
+            trigger_field=trigger_field,
+            poison_field=poison_field,
             batch_size=args.batch_size,
             max_length=args.max_length,
             max_new_tokens=args.max_new_tokens,

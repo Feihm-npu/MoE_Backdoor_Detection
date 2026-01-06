@@ -9,7 +9,8 @@ EXP="basic"
 MODEL_NAME="Qwen/Qwen1.5-MoE-A2.7B"
 # MODEL_NAME="/home/feihm/llm-fei/CLIBE/MoE/runs/qwen-moe-backdoor-attack-5pct/checkpoint-200"
 # MODEL_NAME="runs/qwen1p5moe_bf16_z3_sst/checkpoint-1578"
-TRIGGERED_JSONL="/home/feihm/llm-fei/CLIBE/MoE/data/ag_news_triggered_test_target1/test.jsonl"
+TRIGGERED_DATASET="/home/feihm/llm-fei/CLIBE/MoE/data/backdoored_dataset/ag_news_perplexity"
+# TRIGGERED_JSONL="/home/feihm/llm-fei/CLIBE/MoE/data/ag_news_triggered_test_target1/test.jsonl"
 
 OUT_DIR="assets/${EXP}/"
 # OUT_NAME="routing_records_backdoored.pt"
@@ -21,7 +22,8 @@ python -u classification_backdoors/detection/step0_record_routing_qwen.py \
   --mode both \
   --clean_dataset ag_news \
   --clean_split test \
-  --triggered_jsonl "$TRIGGERED_JSONL" \
+  --triggered_dataset_path "$TRIGGERED_DATASET" \
+  --triggered_split test \
   --num_samples_clean 500 \
   --num_samples_triggered 500 \
   --batch_size 16 \
@@ -30,7 +32,7 @@ python -u classification_backdoors/detection/step0_record_routing_qwen.py \
   --dtype bf16 \
   --save_pred false \
   --output_dir "$OUT_DIR" \
-  --output_name "$OUT_NAME" \
-  --triggers_txt data/ag_news_triggered_test_target1/triggers.txt 
+  --output_name "$OUT_NAME"
+#  --triggers_txt data/ag_news_triggered_test_target1/triggers.txt 
 
 echo "[OK] Saved to ${OUT_DIR}/${OUT_NAME}"

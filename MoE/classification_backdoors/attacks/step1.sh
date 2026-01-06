@@ -1,4 +1,7 @@
 #!/bin/bash
+
+## Using "Plug and Play Language Model" (PPLM) to generate poisoned data with dynamic triggers
+
 export CUDA_VISIBLE_DEVICES=0  # 生成只需要一张卡即可
 
 # 设置参数
